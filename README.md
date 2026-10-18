@@ -1,5 +1,7 @@
 # Mnemo
 
+[![CI](https://github.com/GaouravPatil/Mnemo/actions/workflows/ci.yml/badge.svg)](https://github.com/GaouravPatil/Mnemo/actions/workflows/ci.yml)
+
 Memory-as-a-service for LLMs: a model-agnostic memory layer that turns chat
 history into compact, deduplicated facts and returns the smallest context a
 model needs to continue a task.
@@ -138,6 +140,10 @@ the rules extractor.
 44 tests cover extraction/compression, supersede and paraphrase semantics,
 budget-packing invariants (including a flake-resistant omitted-index check),
 the HTTP API (auth, CORS, health), and concurrent writes.
+
+CI (`.github/workflows/ci.yml`) runs on every push/PR: pytest and the
+benchmark quality gate on Python 3.12 and 3.13, plus a Docker job that builds
+the image and smoke-tests `/health`, write, and read inside a live container.
 
 ## Configuration
 

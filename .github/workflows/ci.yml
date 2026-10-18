@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+      - name: Run tests
+        run: python -m pytest -q
+      - name: Run quality-gate benchmark
+        run: python benchmark.py
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build image
+        run: docker build -t mnemo:ci .
+      - name: Smoke test container
+        run: |
+          docker run -d --name mnemo -p 8000:8000 -e MNEMO_API_KEY=ci-key mnemo:ci
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8000/health >/dev/null && break
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:8000/health | grep -q '"status":"ok"'
+          curl -sf http://127.0.0.1:8000/memory/write \
+            -H 'X-API-Key: ci-key' -H 'Content-Type: application/json' \
+            -d '{"space_id":"ci","content":"The gateway timeout is 30s."}' \
+            | grep -q '"written"'
+          curl -sf http://127.0.0.1:8000/memory/read \
+            -H 'X-API-Key: ci-key' -H 'Content-Type: application/json' \
+            -d '{"space_id":"ci","query":"timeout","max_tokens":100}' \
+            | grep -qi 'timeout'
+      - name: Container logs
+        if: always()
+        run: docker logs mnemo
