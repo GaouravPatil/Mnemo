@@ -13,7 +13,8 @@ async function saveConfig() {
   const baseUrl = $("baseUrl").value.trim().replace(/\/$/, "") || "http://127.0.0.1:8000";
   const apiKey = $("apiKey").value.trim();
   const space = $("space").value.trim() || "default";
-  await chrome.storage.sync.set({ baseUrl, apiKey, space });
+  const autoCapture = $("autoCapture").checked;
+  await chrome.storage.sync.set({ baseUrl, apiKey, space, autoCapture });
 
   try {
     const origin = new URL(baseUrl).origin + "/*";
@@ -47,14 +48,16 @@ async function withConfig(fn) {
 }
 
 async function loadConfig() {
-  const { baseUrl, apiKey, space } = await chrome.storage.sync.get({
+  const { baseUrl, apiKey, space, autoCapture } = await chrome.storage.sync.get({
     baseUrl: "http://127.0.0.1:8000",
-    apiKey: "",
+    apiKey: "mnemo-dev-key",
     space: "default",
+    autoCapture: true,
   });
   $("baseUrl").value = baseUrl;
   $("apiKey").value = apiKey;
   $("space").value = space;
+  $("autoCapture").checked = autoCapture !== false;
 }
 
 $("save").addEventListener("click", async () => {

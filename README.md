@@ -182,9 +182,11 @@ Dockerfile      multi-stage alpine image (~50 MB, non-root, /data volume)
 
 ## Chrome extension
 
-`extension/` contains an MV3 scaffold that uses the server as shared memory:
-a popup for settings and write/read, and a background service worker that
-relays all API calls. Load it unpacked from `chrome://extensions`; see
-`extension/README.md` for setup. The server allows `chrome-extension://`
-origins by default (configurable via `MNEMO_CORS_ORIGIN_REGEX` /
-`MNEMO_CORS_ORIGINS`).
+`extension/` contains an MV3 extension that uses the server as shared memory:
+a popup for settings and write/read, a background service worker that relays
+all API calls, and an invisible content script on ChatGPT/Claude/Gemini that
+auto-captures conversations and offers a one-time "Add context" prompt when
+you switch models (copies a paste-ready memory block). Load it unpacked from
+`chrome://extensions`; see `extension/README.md` for setup. The server allows
+`chrome-extension://` origins by default (configurable via
+`MNEMO_CORS_ORIGIN_REGEX` / `MNEMO_CORS_ORIGINS`).

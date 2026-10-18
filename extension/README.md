@@ -6,16 +6,28 @@ as shared memory for the LLM tools you use in the browser.
 ## How it works
 
 ```
-popup  ──chrome.runtime──▶  background service worker  ──fetch──▶  Mnemo server
-                                 (single API gateway)
+content script ──┐
+popup  ──────────┴─chrome.runtime──▶  background service worker  ──fetch──▶  Mnemo server
+                                          (single API gateway)
 ```
 
-- `src/popup.html` / `src/popup.js` — settings (server URL, API key, space)
-  plus write/read controls for a quick manual loop.
+- `src/popup.html` / `src/popup.js` — settings (server URL, API key, space,
+  auto-capture toggle) plus write/read controls for a quick manual loop.
+- `src/content.js` — runs invisibly on chat sites (ChatGPT, Claude, Gemini):
+  - **Auto-capture**: a DOM observer silently sends the conversation to Mnemo
+    ~12s after activity stops (server-side dedupe/supersede handles repeats).
+  - **Context prompt**: when memory from other AI chats exists, a small
+    one-time prompt appears: *Add context* copies a prompt-ready markdown
+    block to the clipboard (paste with Ctrl+V), *Not now* dismisses it for
+    that tab. No permanent UI on the page.
 - `src/background.js` — service worker that owns all API calls. Content
   scripts and popups message it, so the page origin never talks to Mnemo
   directly.
 - `src/mnemo.js` — browser-safe JS port of `client.ts` from the repo root.
+
+The space is shared across all chat sites and models by default, so a fact
+you save on ChatGPT is recalled on Claude. All captured text goes only to
+your own Mnemo server.
 
 Settings live in `chrome.storage.sync`. The API key is entered by the user,
 never bundled in the extension source.
@@ -34,6 +46,9 @@ never bundled in the extension source.
 
 3. Open the popup: set the server URL and API key (`mnemo-dev-key` unless you
    changed `MNEMO_API_KEY`), pick a space, press **Save**, then **Test**.
+4. Chat normally on any supported site — capture is automatic. Open a
+   different LLM and use the *Add context* prompt to prove the shared memory
+   loop. Auto-capture can be turned off in the popup.
 
 The ID of an unpacked extension is stable per path/machine but can differ
 across developers, which is fine because the server accepts any Chrome

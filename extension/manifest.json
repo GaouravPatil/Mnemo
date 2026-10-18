@@ -1,9 +1,21 @@
 {
   "manifest_version": 3,
   "name": "Mnemo",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Shared LLM memory backed by a local Mnemo server.",
   "permissions": ["storage"],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*",
+        "https://claude.ai/*",
+        "https://gemini.google.com/*"
+      ],
+      "js": ["src/content.js"],
+      "run_at": "document_idle"
+    }
+  ],
   "host_permissions": ["http://127.0.0.1:8000/*", "http://localhost:8000/*"],
   "optional_host_permissions": ["http://*/*", "https://*/*"],
   "background": {

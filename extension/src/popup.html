@@ -25,6 +25,10 @@
         box-sizing: border-box;
         padding: 5px;
       }
+      input[type="checkbox"] {
+        width: auto;
+        margin-right: 6px;
+      }
       textarea {
         height: 56px;
         resize: vertical;
@@ -60,8 +64,12 @@
     <input id="baseUrl" placeholder="http://127.0.0.1:8000" />
     <label for="apiKey">API key</label>
     <input id="apiKey" type="password" placeholder="mnemo-dev-key" />
-    <label for="space">Space</label>
+    <label for="space">Space (shared across sites and models)</label>
     <input id="space" placeholder="default" />
+    <label>
+      <input id="autoCapture" type="checkbox" checked />
+      Auto-capture conversations on chat sites
+    </label>
     <div class="row">
       <button id="save">Save</button>
       <button id="test">Test</button>

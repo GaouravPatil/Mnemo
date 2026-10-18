@@ -88,6 +88,7 @@ ATOMIC_SPLIT = re.compile(r",\s+(?!(?:and|but)\b)|;\s+|\s+(?:and|but)\s+")
 META_NOISE = re.compile(
     r"^(?:(?:i|you|we)\s+)?(?:'ll|will|can)\s+remember\b|"
     r"^i(?:'ll| will| can| should)?\s+(?:remember|note|keep|save|store|track)\b|"
+    r"^i(?:'ve| have) taken\b|"
     r"^i have (?:everything|all|it)\b|"
     r"^let me(?!\s+(?:recap|confirm|repeat|restate|summari[sz]e|make sure)\b)\b|^let's\b|"
     r"^here(?:'s| is)\b|^sounds good\b|^will do\b|^understood\b|"
@@ -102,6 +103,12 @@ ACK_START = re.compile(
 )
 FRAGMENT = re.compile(
     r"^(?:two|three|four|a couple|a few|several)\b.*\b(?:constraints?|things?|items?|points?|steps?|options?)$",
+    re.I,
+)
+MNEMO_ARTIFACT = re.compile(
+    r"^(?:#mem\b|_mem:|omitted:|omitted\s+[\"#]|-?\s*_omitted_:|exact values? verbatim|\{\"v\":\d|"
+    r"treat (?:it|this|these|them) as established\b)|"
+    r"(?:^|[;\s])t=[dcstfeq](?:/[dcstfeq])+\b",
     re.I,
 )
 ACK_PREFIX = re.compile(
@@ -214,6 +221,8 @@ def is_noise(text):
     if not t:
         return True
     if t in ACKS:
+        return True
+    if MNEMO_ARTIFACT.match(t):
         return True
     ex = exact_tokens(t)
     if ex:

@@ -90,6 +90,35 @@ def test_production_turn_with_question_not_stored_as_question(svc):
     assert "prod-east" in units[0][1]
 
 
+def test_mnemo_format_artifacts_never_stored(svc):
+    write(
+        svc,
+        '#MEM T=d/c/s/t/f/e/q; exact verbatim; omitted "#id label" GET /memory/unit/id',
+        "omitted: #62ecbb60 timeout label",
+        "_MEM: T text (d decision, c constraint, s state, t todo, f fact); exact values verbatim._",
+        "- _omitted_: #62ecbb60 timeout, #deadbeef config",
+        "The gateway timeout is 30s.",
+    )
+    body = "\n".join(texts(svc))
+    assert "30s" in body
+    assert "#MEM" not in body and "_MEM" not in body
+    assert "omitted" not in body.lower()
+
+
+def test_recall_framing_and_context_acks_never_stored(svc):
+    write(
+        svc,
+        "Here is shared memory from this user's previous sessions across AI tools.",
+        "Treat it as established context and use it when answering:",
+        "I've taken that in as context for this session:",
+        "The gateway timeout is 30s.",
+    )
+    body = "\n".join(texts(svc))
+    assert "30s" in body
+    assert "established context" not in body
+    assert "taken that in" not in body
+
+
 def test_supersede_exact_threshold_is_configurable(tmp_path):
     from mnemo.config import Config
     from mnemo.service import MemoryService
