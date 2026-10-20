@@ -65,6 +65,14 @@ it for `GET /memory/unit/{id}` history.
   works offline. An OpenAI-compatible LLM extractor is optional and validated
   against the source (exact tokens verbatim, ≥50% content-word overlap) with
   fallback to rules.
+- **English by request**: callers can send `language: "English"`. When an LLM is
+  configured, text is translated before extraction; exact tokens are re-checked
+  and the source is kept if translation would add or drop one. Without an LLM
+  the original text is stored and the response carries a warning.
+- **Usage ledger**: per-request token counts are stored separately from memory
+  units and deduplicated by `responseId`, so restarts and repeated polls do not
+  double-count. The Antigravity extension uses this to show input, output,
+  cache-read, and reasoning tokens by model and day.
 - **SQLite + FTS5**: no external services; single-file backup; the schema is
   simple enough to audit.
 - **Aggressive dedupe, conservative information loss**: paraphrases merge,

@@ -14,7 +14,8 @@ async function saveConfig() {
   const apiKey = $("apiKey").value.trim();
   const space = $("space").value.trim() || "default";
   const autoCapture = $("autoCapture").checked;
-  await chrome.storage.sync.set({ baseUrl, apiKey, space, autoCapture });
+  const translateToEnglish = $("translateToEnglish").checked;
+  await chrome.storage.sync.set({ baseUrl, apiKey, space, autoCapture, translateToEnglish });
 
   try {
     const origin = new URL(baseUrl).origin + "/*";
@@ -48,16 +49,19 @@ async function withConfig(fn) {
 }
 
 async function loadConfig() {
-  const { baseUrl, apiKey, space, autoCapture } = await chrome.storage.sync.get({
-    baseUrl: "http://127.0.0.1:8000",
-    apiKey: "mnemo-dev-key",
-    space: "default",
-    autoCapture: true,
-  });
+  const { baseUrl, apiKey, space, autoCapture, translateToEnglish } =
+    await chrome.storage.sync.get({
+      baseUrl: "http://127.0.0.1:8000",
+      apiKey: "mnemo-dev-key",
+      space: "default",
+      autoCapture: true,
+      translateToEnglish: true,
+    });
   $("baseUrl").value = baseUrl;
   $("apiKey").value = apiKey;
   $("space").value = space;
   $("autoCapture").checked = autoCapture !== false;
+  $("translateToEnglish").checked = translateToEnglish !== false;
 }
 
 $("save").addEventListener("click", async () => {
@@ -81,7 +85,10 @@ $("write").addEventListener("click", async () => {
     setStatus("nothing to write");
     return;
   }
-  const data = await withConfig((space) => send({ type: "write", space, content }));
+  const language = $("translateToEnglish").checked ? "English" : undefined;
+  const data = await withConfig((space) =>
+    send({ type: "write", space, content, language }),
+  );
   if (data) {
     setOutput(data.written);
     $("writeText").value = "";

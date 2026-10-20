@@ -1,0 +1,64 @@
+{
+  "name": "mnemo-antigravity",
+  "displayName": "Mnemo for Antigravity",
+  "description": "Capture Antigravity conversations and token usage into shared Mnemo memory.",
+  "version": "0.1.0",
+  "publisher": "mnemo",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "https://github.com/GaouravPatil/Mnemo.git" },
+  "engines": { "vscode": "^1.75.0" },
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./src/extension.js",
+  "contributes": {
+    "commands": [
+      { "command": "mnemo.captureNow", "title": "Mnemo: Capture conversation now" },
+      { "command": "mnemo.showSummary", "title": "Mnemo: Show memory dashboard" },
+      { "command": "mnemo.copyContext", "title": "Mnemo: Copy shared context" },
+      { "command": "mnemo.testConnection", "title": "Mnemo: Test server connection" },
+      { "command": "mnemo.openSettings", "title": "Mnemo: Open settings" }
+    ],
+    "configuration": {
+      "title": "Mnemo",
+      "properties": {
+        "mnemo.baseUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:8000",
+          "description": "Mnemo server URL."
+        },
+        "mnemo.apiKey": {
+          "type": "string",
+          "default": "mnemo-dev-key",
+          "description": "Mnemo API key."
+        },
+        "mnemo.space": {
+          "type": "string",
+          "default": "antigravity",
+          "description": "Memory space shared across models and IDEs."
+        },
+        "mnemo.autoCapture": {
+          "type": "boolean",
+          "default": true,
+          "description": "Continuously capture new Antigravity conversation turns."
+        },
+        "mnemo.pollSeconds": {
+          "type": "number",
+          "default": 20,
+          "minimum": 5,
+          "description": "How often to check for new conversation turns."
+        },
+        "mnemo.translateToEnglish": {
+          "type": "boolean",
+          "default": true,
+          "description": "Ask Mnemo to store memory in English. Requires an LLM extractor/translator on the server."
+        },
+        "mnemo.maxCaptureChars": {
+          "type": "number",
+          "default": 20000,
+          "minimum": 1000,
+          "description": "Maximum characters sent in one capture."
+        }
+      }
+    }
+  }
+}

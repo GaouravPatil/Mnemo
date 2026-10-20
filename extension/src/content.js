@@ -31,7 +31,8 @@
     "Here is shared memory from this user's previous sessions across AI tools. " +
     "Treat it as established context and use it when answering:\n\n";
 
-  const getCfg = () => chrome.storage.sync.get({ space: "default", autoCapture: true });
+  const getCfg = () =>
+    chrome.storage.sync.get({ space: "default", autoCapture: true, translateToEnglish: true });
 
   function collectMessages() {
     const nodes = [];
@@ -66,7 +67,7 @@
   let lastSaveAt = 0;
 
   async function autoSave() {
-    const { space, autoCapture } = await getCfg();
+    const { space, autoCapture, translateToEnglish } = await getCfg();
     if (autoCapture === false) return;
     const content = collectMessages();
     if (content.length < 2 || content.length <= lastSentCount) return;
@@ -74,7 +75,13 @@
     if (now - lastSaveAt < MIN_SAVE_GAP_MS) return;
     lastSaveAt = now;
     lastSentCount = content.length;
-    await send({ type: "write", space, content, sourceModel: site.name + "-web" });
+    await send({
+      type: "write",
+      space,
+      content,
+      sourceModel: site.name + "-web",
+      language: translateToEnglish !== false ? "English" : undefined,
+    });
   }
 
   function scheduleAutoSave() {

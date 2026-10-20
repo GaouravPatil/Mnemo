@@ -38,6 +38,25 @@ CREATE TABLE IF NOT EXISTS units (
 CREATE INDEX IF NOT EXISTS idx_units_space ON units(space_id, deleted, superseded_by);
 CREATE INDEX IF NOT EXISTS idx_units_fp ON units(space_id, fingerprint);
 CREATE INDEX IF NOT EXISTS idx_units_space_time ON units(space_id, created_at);
+CREATE TABLE IF NOT EXISTS usage (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    space_id TEXT NOT NULL,
+    source_model TEXT NOT NULL DEFAULT '',
+    session_id TEXT NOT NULL DEFAULT '',
+    model TEXT NOT NULL DEFAULT '',
+    ts REAL NOT NULL,
+    input_tokens INTEGER NOT NULL DEFAULT 0,
+    output_tokens INTEGER NOT NULL DEFAULT 0,
+    cache_read_tokens INTEGER NOT NULL DEFAULT 0,
+    cache_write_tokens INTEGER NOT NULL DEFAULT 0,
+    reasoning_tokens INTEGER NOT NULL DEFAULT 0,
+    response_id TEXT NOT NULL DEFAULT '',
+    meta TEXT NOT NULL DEFAULT '{}'
+);
+CREATE INDEX IF NOT EXISTS idx_usage_space_time ON usage(space_id, ts);
+CREATE INDEX IF NOT EXISTS idx_usage_model ON usage(space_id, model);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_usage_response
+    ON usage(space_id, response_id) WHERE response_id != '';
 """
 
 FTS_SCHEMA = "CREATE VIRTUAL TABLE IF NOT EXISTS units_fts USING fts5(unit_id UNINDEXED, text, keys);"
@@ -248,3 +267,90 @@ class Store:
         except sqlite3.OperationalError:
             return {}
         return {r["uid"]: -r["s"] for r in rows}
+
+    def count_writes(self, space_id):
+        with self.connection() as con:
+            row = con.execute("SELECT COUNT(*) FROM writes WHERE space_id=?", (space_id,)).fetchone()
+        return row[0]
+
+    def insert_usage(self, row):
+        with self.write_tx() as con:
+            cur = con.execute(
+                """INSERT OR IGNORE INTO usage(
+                   space_id, source_model, session_id, model, ts, input_tokens,
+                   output_tokens, cache_read_tokens, cache_write_tokens,
+                   reasoning_tokens, response_id, meta)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (
+                    row["space_id"],
+                    row.get("source_model") or "",
+                    row.get("session_id") or "",
+                    row.get("model") or "",
+                    row["ts"],
+                    int(row.get("input_tokens") or 0),
+                    int(row.get("output_tokens") or 0),
+                    int(row.get("cache_read_tokens") or 0),
+                    int(row.get("cache_write_tokens") or 0),
+                    int(row.get("reasoning_tokens") or 0),
+                    row.get("response_id") or "",
+                    json.dumps(row.get("meta") or {}),
+                ),
+            )
+            return cur.rowcount > 0
+
+    def usage_summary(self, space_id, since=None, until=None):
+        where = ["space_id=?"]
+        args = [space_id]
+        if since is not None:
+            where.append("ts>=?")
+            args.append(float(since))
+        if until is not None:
+            where.append("ts<=?")
+            args.append(float(until))
+        clause = " AND ".join(where)
+        with self.connection() as con:
+            total = con.execute(
+                f"""SELECT COUNT(*) AS calls,
+                    COALESCE(SUM(input_tokens),0) AS input_tokens,
+                    COALESCE(SUM(output_tokens),0) AS output_tokens,
+                    COALESCE(SUM(cache_read_tokens),0) AS cache_read_tokens,
+                    COALESCE(SUM(cache_write_tokens),0) AS cache_write_tokens,
+                    COALESCE(SUM(reasoning_tokens),0) AS reasoning_tokens
+                    FROM usage WHERE {clause}""",
+                args,
+            ).fetchone()
+            by_model = con.execute(
+                f"""SELECT model, COUNT(*) AS calls,
+                    COALESCE(SUM(input_tokens),0) AS input_tokens,
+                    COALESCE(SUM(output_tokens),0) AS output_tokens,
+                    COALESCE(SUM(cache_read_tokens),0) AS cache_read_tokens,
+                    COALESCE(SUM(cache_write_tokens),0) AS cache_write_tokens,
+                    COALESCE(SUM(reasoning_tokens),0) AS reasoning_tokens
+                    FROM usage WHERE {clause}
+                    GROUP BY model ORDER BY calls DESC""",
+                args,
+            ).fetchall()
+            by_day = con.execute(
+                f"""SELECT date(ts, 'unixepoch') AS day, COUNT(*) AS calls,
+                    COALESCE(SUM(input_tokens),0) AS input_tokens,
+                    COALESCE(SUM(output_tokens),0) AS output_tokens,
+                    COALESCE(SUM(cache_read_tokens),0) AS cache_read_tokens,
+                    COALESCE(SUM(reasoning_tokens),0) AS reasoning_tokens
+                    FROM usage WHERE {clause}
+                    GROUP BY day ORDER BY day DESC LIMIT 31""",
+                args,
+            ).fetchall()
+        totals = dict(total)
+        totals["total_tokens"] = (
+            totals["input_tokens"]
+            + totals["output_tokens"]
+            + totals["cache_read_tokens"]
+            + totals["cache_write_tokens"]
+            + totals["reasoning_tokens"]
+        )
+        return {
+            "space_id": space_id,
+            "totals": totals,
+            "by_model": [dict(r) for r in by_model],
+            "by_day": [dict(r) for r in by_day],
+        }

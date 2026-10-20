@@ -14,7 +14,7 @@ async function handle(msg) {
     case "health":
       return client.health();
     case "write":
-      return client.write(msg.space, msg.content, msg.sourceModel);
+      return client.write(msg.space, msg.content, msg.sourceModel, undefined, msg.language);
     case "read":
       return client.read(msg.space, {
         query: msg.query,

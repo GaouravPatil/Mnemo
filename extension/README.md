@@ -12,7 +12,7 @@ popup  ──────────┴─chrome.runtime──▶  background s
 ```
 
 - `src/popup.html` / `src/popup.js` — settings (server URL, API key, space,
-  auto-capture toggle) plus write/read controls for a quick manual loop.
+  auto-capture, store-in-English) plus write/read controls for a quick loop.
 - `src/content.js` — runs invisibly on chat sites (ChatGPT, Claude, Gemini):
   - **Auto-capture**: a DOM observer silently sends the conversation to Mnemo
     ~12s after activity stops (server-side dedupe/supersede handles repeats).
@@ -30,7 +30,10 @@ you save on ChatGPT is recalled on Claude. All captured text goes only to
 your own Mnemo server.
 
 Settings live in `chrome.storage.sync`. The API key is entered by the user,
-never bundled in the extension source.
+never bundled in the extension source. **Store memory in English** sends
+`language: "English"`; the server translates non-English text when
+`MNEMO_LLM_BASE_URL` / `MNEMO_LLM_MODEL` / `MNEMO_LLM_API_KEY` are configured,
+and keeps the source text with a warning otherwise.
 
 ## Load it
 

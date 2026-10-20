@@ -90,6 +90,29 @@ Formats: `compact` (default), `json`, `markdown`. `max_tokens` is enforced by
 the benchmarked tokenizer; `target_model` (e.g. `gpt-4o`, `claude-sonnet-4`)
 selects the encoding. Use `include_superseded: true` to include history.
 
+### `POST /memory/summary`
+
+Returns a Markdown summary plus type counts, token stats, and quality metrics
+(`precision_proxy`, `exact_key_coverage`, `dedupe_ratio`, `supersede_ratio`).
+
+```bash
+curl -s localhost:8000/memory/summary \
+  -H 'X-API-Key: mnemo-dev-key' -H 'Content-Type: application/json' \
+  -d '{"space_id": "ledger", "max_tokens": 300}'
+```
+
+### Usage ledger
+
+`POST /usage/report` stores per-request token usage; rows are deduplicated by
+`response_id`. `GET /usage/summary?space_id=...` returns totals, per-model, and
+per-day breakdowns. Both are used by the Antigravity extension.
+
+```bash
+curl -s localhost:8000/usage/report \
+  -H 'X-API-Key: mnemo-dev-key' -H 'Content-Type: application/json' \
+  -d '{"space_id": "ledger", "rows": [{"model": "claude-sonnet-4-6", "input_tokens": 1200, "output_tokens": 300, "response_id": "req-1"}]}'
+```
+
 ### `GET /memory/unit/{id}` and `DELETE /memory/unit/{id}`
 
 Fetch a unit with its full replacement history (or soft-delete it). Omitted
@@ -137,7 +160,7 @@ the rules extractor.
 .venv/bin/python -m pytest -q
 ```
 
-44 tests cover extraction/compression, supersede and paraphrase semantics,
+51 tests cover extraction/compression, supersede and paraphrase semantics,
 budget-packing invariants (including a flake-resistant omitted-index check),
 the HTTP API (auth, CORS, health), and concurrent writes.
 
@@ -152,6 +175,7 @@ the image and smoke-tests `/health`, write, and read inside a live container.
 | `MNEMO_DB` | `data/mnemo.db` | SQLite path |
 | `MNEMO_API_KEY` | `mnemo-dev-key` | API key |
 | `MNEMO_EXTRACTOR` | `rules` | `rules` or `llm` |
+| `MNEMO_OUTPUT_LANGUAGE` | `English` | target language; translation needs LLM settings |
 | `MNEMO_TOKENIZER` | `cl100k_base` | default encoding |
 | `MNEMO_MAX_TOKENS` | `800` | default read budget |
 | `MNEMO_LLM_BASE_URL` / `MNEMO_LLM_MODEL` / `MNEMO_LLM_API_KEY` | empty | LLM extractor |
@@ -173,10 +197,11 @@ mnemo/
   pack.py       compact/json/markdown context packers
   tokens.py     tiktoken token counting per target model
   embed.py      local hash embedder and OpenAI-compatible embedder
-tests/          pytest suite (44 tests)
+tests/          pytest suite (51 tests)
 benchmark.py    compression/recall benchmark over three conversation samples
 client.ts       TypeScript client
 extension/      Chrome MV3 scaffold (manifest, popup, background relay, JS client)
+antigravity-extension/  Antigravity/VS Code extension (capture, usage, dashboard)
 Dockerfile      multi-stage alpine image (~50 MB, non-root, /data volume)
 ```
 
@@ -190,3 +215,19 @@ you switch models (copies a paste-ready memory block). Load it unpacked from
 `chrome://extensions`; see `extension/README.md` for setup. The server allows
 `chrome-extension://` origins by default (configurable via
 `MNEMO_CORS_ORIGIN_REGEX` / `MNEMO_CORS_ORIGINS`).
+
+## Antigravity extension
+
+`antigravity-extension/` is a VS Code-compatible extension for Google
+Antigravity and Antigravity IDE. It discovers the local Antigravity language
+server, captures new user/assistant turns into Mnemo, reports exact token usage
+(input, output, cache-read, reasoning) from
+`GetCascadeTrajectoryGeneratorMetadata`, and shows a dashboard with the memory
+summary, precision proxy, dedupe ratio, and usage by model and day. A
+**Copy shared context** command produces paste-ready Markdown for any other
+model. See `antigravity-extension/README.md` for install and settings.
+
+Setting `mnemo.translateToEnglish` sends `language: "English"`; the server
+translates non-English text before extraction when `MNEMO_LLM_BASE_URL`,
+`MNEMO_LLM_MODEL`, and `MNEMO_LLM_API_KEY` are configured. Exact tokens are
+validated after translation and the source is kept if validation fails.

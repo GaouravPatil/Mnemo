@@ -23,12 +23,13 @@ export class Mnemo {
     return this.req("GET", "/health");
   }
 
-  write(spaceId, content, sourceModel = "chrome-extension", meta) {
+  write(spaceId, content, sourceModel = "chrome-extension", meta, language) {
     return this.req("POST", "/memory/write", {
       space_id: spaceId,
       content,
       source_model: sourceModel,
       meta,
+      language,
     });
   }
 
@@ -43,6 +44,26 @@ export class Mnemo {
 
   async context(spaceId, opts = {}) {
     return (await this.read(spaceId, opts)).context;
+  }
+
+  summary(spaceId, opts = {}) {
+    return this.req("POST", "/memory/summary", {
+      space_id: spaceId,
+      query: opts.query,
+      max_tokens: opts.maxTokens ?? 400,
+      target_model: opts.targetModel,
+    });
+  }
+
+  reportUsage(spaceId, rows) {
+    return this.req("POST", "/usage/report", { space_id: spaceId, rows });
+  }
+
+  usageSummary(spaceId, since, until) {
+    const params = new URLSearchParams({ space_id: spaceId });
+    if (since !== undefined) params.set("since", String(since));
+    if (until !== undefined) params.set("until", String(until));
+    return this.req("GET", `/usage/summary?${params.toString()}`);
   }
 
   unit(unitId) {

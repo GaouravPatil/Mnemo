@@ -21,6 +21,8 @@ class Config:
     llm_api_key: str = ""
     llm_model: str = ""
 
+    output_language: str = "English"
+
     embedding: str = "local"
     embedding_base_url: str = ""
     embedding_api_key: str = ""
@@ -50,6 +52,7 @@ class Config:
             llm_base_url=_s("MNEMO_LLM_BASE_URL", ""),
             llm_api_key=_s("MNEMO_LLM_API_KEY", ""),
             llm_model=_s("MNEMO_LLM_MODEL", ""),
+            output_language=_s("MNEMO_OUTPUT_LANGUAGE", "English"),
             embedding=_s("MNEMO_EMBEDDING", "local"),
             embedding_base_url=_s("MNEMO_EMBEDDING_BASE_URL", ""),
             embedding_api_key=_s("MNEMO_EMBEDDING_API_KEY", ""),

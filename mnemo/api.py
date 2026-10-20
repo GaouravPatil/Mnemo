@@ -15,6 +15,34 @@ class WriteRequest(BaseModel):
     source_model: str = "unknown"
     meta: dict | None = None
     extract: Literal["rules", "llm"] | None = None
+    language: str | None = None
+
+
+class SummaryRequest(BaseModel):
+    space_id: str = Field(min_length=1)
+    query: str | None = None
+    max_tokens: int = Field(default=400, ge=1)
+    target_model: str | None = None
+
+
+class UsageRow(BaseModel):
+    space_id: str | None = None
+    source_model: str = ""
+    session_id: str = ""
+    model: str = ""
+    ts: float | None = None
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cache_read_tokens: int = 0
+    cache_write_tokens: int = 0
+    reasoning_tokens: int = 0
+    response_id: str = ""
+    meta: dict | None = None
+
+
+class UsageReportRequest(BaseModel):
+    space_id: str = Field(min_length=1)
+    rows: list[UsageRow]
 
 
 class ReadRequest(BaseModel):
@@ -59,6 +87,7 @@ def create_app(cfg=None):
             source_model=req.source_model,
             meta=req.meta,
             extract=req.extract,
+            language=req.language,
         )
 
     @app.post("/memory/read", dependencies=[Depends(auth)])
@@ -73,6 +102,28 @@ def create_app(cfg=None):
             encoding=req.encoding,
             include_superseded=req.include_superseded,
         )
+
+    @app.post("/memory/summary", dependencies=[Depends(auth)])
+    def summary(req: SummaryRequest):
+        return svc.summary(
+            req.space_id,
+            query=req.query,
+            max_tokens=req.max_tokens,
+            target_model=req.target_model,
+        )
+
+    @app.post("/usage/report", dependencies=[Depends(auth)])
+    def report_usage(req: UsageReportRequest):
+        rows = []
+        for row in req.rows:
+            item = row.model_dump()
+            item["space_id"] = item.get("space_id") or req.space_id
+            rows.append(item)
+        return svc.report_usage(rows)
+
+    @app.get("/usage/summary", dependencies=[Depends(auth)])
+    def usage_summary(space_id: str, since: float | None = None, until: float | None = None):
+        return svc.usage_summary(space_id, since=since, until=until)
 
     @app.get("/memory/unit/{unit_id}", dependencies=[Depends(auth)])
     def get_unit(unit_id: str):

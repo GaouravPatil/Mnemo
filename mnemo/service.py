@@ -6,6 +6,7 @@ from .extract import get_extractor
 from .pack import compact_line, label, pack
 from .store import Store
 from .tokens import TokenCounter
+from .translate import get_translator
 from .units import (
     CHOICE_CUE,
     SUPERSEDE_CUE,
@@ -33,8 +34,25 @@ class MemoryService:
     def counter(self, target_model=None, encoding=None):
         return TokenCounter(target_model, encoding or self.cfg.default_tokenizer)
 
-    def write(self, space_id, content, source_model="unknown", meta=None, extract=None):
+    def write(
+        self,
+        space_id,
+        content,
+        source_model="unknown",
+        meta=None,
+        extract=None,
+        language=None,
+    ):
         turns = split_turns(content)
+        translator = get_translator(self.cfg, language)
+        translated = 0
+        if translator is not None:
+            converted = []
+            for model, text in turns:
+                out, changed = translator.translate(text)
+                translated += int(changed)
+                converted.append((model, out))
+            turns = converted
         raw = "\n".join(t for _, t in turns)
         mode = extract or self.cfg.extractor
         extracted = get_extractor(mode, self.cfg).extract(turns)
@@ -51,12 +69,19 @@ class MemoryService:
                 results.append(out[0])
                 superseded.extend(out[1])
             superseded.extend(self._consolidate(con, space_id, active, now))
-        return {
+        out = {
             "space_id": space_id,
             "write_id": write_id,
             "written": results,
             "superseded": superseded,
+            "language": (translator.language if translator else None),
+            "translated": translated,
         }
+        if language and translator is None:
+            out["language_warning"] = (
+                "translation requested but MNEMO_LLM_BASE_URL/MNEMO_LLM_MODEL are not configured"
+            )
+        return out
 
     def _write_one(self, con, space_id, eu, request_model, write_id, now, active):
         text = (eu.text or "").strip()
@@ -356,6 +381,67 @@ class MemoryService:
                 "budget": budget,
             },
         }
+
+    def summary(self, space_id, query=None, max_tokens=400, target_model=None):
+        active = self.store.list_active(space_id)
+        all_rows = self.store.list_active(space_id, include_superseded=True)
+        superseded = len(all_rows) - len(active)
+        counts = {}
+        for u in active:
+            counts[u["type"]] = counts.get(u["type"], 0) + 1
+        read = self.read(
+            space_id,
+            query=query,
+            max_tokens=max_tokens,
+            format="markdown",
+            target_model=target_model,
+        )
+        stats = read["stats"]
+        exact_units = sum(1 for u in active if u["keys"])
+        merges = sum(int(u.get("merges") or 0) for u in active)
+        now = time.time()
+        newest = max((u["updated_at"] for u in active), default=None)
+        quality = {
+            "precision_proxy": round(exact_units / len(active), 3) if active else 0.0,
+            "exact_key_coverage": round(exact_units / len(active), 3) if active else 0.0,
+            "dedupe_ratio": round(merges / (merges + len(active)), 3) if active else 0.0,
+            "supersede_ratio": round(superseded / (superseded + len(active)), 3)
+            if active or superseded
+            else 0.0,
+            "avg_unit_tokens": round(stats["stored_tokens"] / len(active), 2) if active else 0.0,
+            "freshness_hours": round((now - newest) / 3600, 2) if newest else None,
+        }
+        writes = self.store.count_writes(space_id)
+        header = [
+            f"# Mnemo summary: {space_id}",
+            f"{len(active)} active units, {superseded} superseded, "
+            f"{writes} writes.",
+            "types: " + (", ".join(f"{k}={v}" for k, v in sorted(counts.items())) or "none"),
+            f"stored context: {stats['stored_tokens']} tokens; "
+            f"precision proxy: {quality['precision_proxy']:.0%} exact-key coverage.",
+        ]
+        return {
+            "space_id": space_id,
+            "query": query,
+            "summary": "\n".join(header) + "\n\n" + read["context"],
+            "writes": writes,
+            "counts": counts,
+            "stats": stats,
+            "quality": quality,
+        }
+
+    def report_usage(self, rows):
+        inserted = 0
+        for row in rows:
+            row = dict(row)
+            if row.get("ts") is None:
+                row["ts"] = time.time()
+            if self.store.insert_usage(row):
+                inserted += 1
+        return {"received": len(rows), "inserted": inserted, "deduplicated": len(rows) - inserted}
+
+    def usage_summary(self, space_id, since=None, until=None):
+        return self.store.usage_summary(space_id, since=since, until=until)
 
     def _rank(self, rows, query, kw, qvec):
         now = time.time()

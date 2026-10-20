@@ -26,12 +26,19 @@ export class Mnemo {
     return this.req("GET", "/health");
   }
 
-  write(spaceId: string, content: string | unknown[], sourceModel = "client", meta?: object) {
+  write(
+    spaceId: string,
+    content: string | unknown[],
+    sourceModel = "client",
+    meta?: object,
+    language?: string,
+  ) {
     return this.req("POST", "/memory/write", {
       space_id: spaceId,
       content,
       source_model: sourceModel,
       meta,
+      language,
     });
   }
 
@@ -46,6 +53,25 @@ export class Mnemo {
 
   async context(spaceId: string, opts: { query?: string; max_tokens?: number } = {}) {
     return (await this.read(spaceId, opts)).context as string;
+  }
+
+  summary(spaceId: string, opts: { query?: string; max_tokens?: number; target_model?: string } = {}) {
+    return this.req("POST", "/memory/summary", {
+      space_id: spaceId,
+      query: opts.query,
+      max_tokens: opts.max_tokens ?? 400,
+      target_model: opts.target_model,
+    });
+  }
+
+  reportUsage(spaceId: string, rows: unknown[]) {
+    return this.req("POST", "/usage/report", { space_id: spaceId, rows });
+  }
+
+  usageSummary(spaceId: string, since?: number) {
+    const params = new URLSearchParams({ space_id: spaceId });
+    if (since !== undefined) params.set("since", String(since));
+    return this.req("GET", `/usage/summary?${params.toString()}`);
   }
 
   unit(unitId: string) {
